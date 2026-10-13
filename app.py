@@ -1,70 +1,50 @@
 import streamlit as st
-import yt_dlp
+import asyncio
 import os
-import uuid
+from pybalt import download
 
 # Configure the Streamlit page
-st.set_page_config(page_title="YT to MP3", page_icon="🎧", layout="centered")
+st.set_page_config(page_title="Cloud YT Downloader", page_icon="☁️", layout="centered")
 
-st.title("YouTube to MP3 Downloader 🎧")
-st.markdown("Enter a YouTube URL below to extract the highest quality audio.")
-
-# Create a temporary directory for processing
-temp_dir = "temp_downloads"
-os.makedirs(temp_dir, exist_ok=True)
+st.title("Cloud YouTube to MP3 ☁️")
+st.markdown("This app uses the free **Cobalt API network** to securely extract audio, completely bypassing YouTube's server blocks!")
 
 url = st.text_input("Enter YouTube Video URL:", placeholder="https://www.youtube.com/watch?v=...")
+
+async def fetch_audio(video_url):
+    # pybalt handles finding a working Cobalt server and downloading the file
+    # We request the MP3 format and a 320kbps bitrate target
+    return await download(
+        video_url,
+        audioFormat="mp3",
+        audioBitrate="320",
+        filenameStyle="pretty"
+    )
 
 if st.button("Extract Audio", type="primary"):
     if url.strip() == "":
         st.warning("Please enter a valid URL.")
     else:
-        with st.spinner("Downloading and converting to MP3... This might take a minute depending on the video length."):
-            # Generate a unique ID for the file to prevent server conflicts
-            file_id = str(uuid.uuid4())
-            
-            # Configure yt-dlp options
-            ydl_opts = {
-                'format': 'bestaudio/best',
-                'noplaylist': True,  # Prevents infinite playlist downloads
-                'extractor_args': {
-                    'youtube': ['player_client=android'] # Try to bypass 403 blocks
-                },
-                'postprocessors': [{
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                    'preferredquality': '320', 
-                }],
-                'outtmpl': f'{temp_dir}/{file_id}.%(ext)s',
-                'quiet': True,
-                'no_warnings': True
-            }
-
+        with st.spinner("Sending request to Cobalt servers... (This is usually much faster than local extraction!)"):
             try:
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    # Extract info and download
-                    info = ydl.extract_info(url, download=True)
-                    video_title = info.get('title', 'youtube_audio')
+                # Streamlit is synchronous, so we run the async pybalt function using asyncio
+                file_path = asyncio.run(fetch_audio(url))
+                
+                if file_path and os.path.exists(file_path):
+                    st.success("Successfully processed by Cobalt!")
                     
-                    # yt-dlp appends .mp3 after the ffmpeg conversion
-                    file_path = f"{temp_dir}/{file_id}.mp3"
-
-                    # Check if the file was created successfully
-                    if os.path.exists(file_path):
-                        st.success(f"Successfully processed: **{video_title}**")
+                    # Read file into memory for the download button
+                    with open(file_path, "rb") as file:
+                        st.download_button(
+                            label="Download MP3",
+                            data=file,
+                            file_name=os.path.basename(file_path),
+                            mime="audio/mpeg"
+                        )
                         
-                        # Read file into memory for the download button
-                        with open(file_path, "rb") as file:
-                            st.download_button(
-                                label="Download MP3",
-                                data=file,
-                                file_name=f"{video_title}.mp3",
-                                mime="audio/mpeg"
-                            )
-                            
-                        # Clean up the file from the server immediately to save space
-                        os.remove(file_path)
-                    else:
-                        st.error("Conversion failed. Please try a different video.")
+                    # Clean up the file from the Streamlit server to save space
+                    os.remove(file_path)
+                else:
+                    st.error("Conversion failed. The Cobalt network might be overloaded or the video is restricted.")
             except Exception as e:
-                st.error(f"An error occurred: {e}")
+                st.error(f"An API error occurred: {e}")
