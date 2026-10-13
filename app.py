@@ -26,10 +26,14 @@ if st.button("Extract Audio", type="primary"):
             # Configure yt-dlp options
             ydl_opts = {
                 'format': 'bestaudio/best',
+                'noplaylist': True,  # Prevents infinite playlist downloads
+                'extractor_args': {
+                    'youtube': ['player_client=android'] # Try to bypass 403 blocks
+                },
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
-                    'preferredquality': '320', # Highest standard quality
+                    'preferredquality': '320', 
                 }],
                 'outtmpl': f'{temp_dir}/{file_id}.%(ext)s',
                 'quiet': True,
