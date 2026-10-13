@@ -1,6 +1,2 @@
 streamlit
-pybalt
-pyyaml
-python-dotenv
-aiohttp
-aiofiles
+requests
