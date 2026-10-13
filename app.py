@@ -18,31 +18,32 @@ if st.button("Extract Audio", type="primary"):
         # Clean the URL of any playlist tags automatically
         clean_url = url.split('&')[0]
         
-        with st.spinner("Connecting directly to Cobalt's main API..."):
+        with st.spinner("Connecting directly to Cobalt's v10 API..."):
             try:
                 # Cobalt v10 API endpoint
                 api_url = "https://api.cobalt.tools/"
                 
-                # Standard headers to bypass basic bot-protection blocks
+                # Standard headers for the v10 API
                 headers = {
                     "Accept": "application/json",
-                    "Content-Type": "application/json",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+                    "Content-Type": "application/json"
                 }
                 
-                # Request an MP3 payload
+                # The v10 API uses "downloadMode" instead of the old "isAudioOnly" parameter
                 payload = {
                     "url": clean_url,
                     "audioFormat": "mp3",
-                    "isAudioOnly": True
+                    "downloadMode": "audio"
                 }
                 
                 response = requests.post(api_url, json=payload, headers=headers)
                 data = response.json()
                 
-                # Check if Cobalt gave us a direct download link
-                if "url" in data:
-                    download_url = data["url"]
+                # Cobalt v10 returns a 'status' key to define the response type
+                status = data.get("status")
+                
+                if status in ["redirect", "tunnel"]:
+                    download_url = data.get("url")
                     st.info("Extraction successful! Transferring file to your app...")
                     
                     # Download the MP3 to the Streamlit server
@@ -67,11 +68,14 @@ if st.button("Extract Audio", type="primary"):
                     # Clean up the server space
                     os.remove(file_path)
                     
-                # If Cobalt refused the link, it returns a 'text' error
-                elif "text" in data:
-                    st.error(f"Cobalt Server Error: {data['text']}")
+                elif status == "error":
+                    # The error text is nested inside an 'error' dictionary in v10
+                    error_text = data.get("error", {}).get("text", "Unknown API error")
+                    st.error(f"Cobalt Server Error: {error_text}")
+                    
                 else:
-                    st.error("Received an unknown response from the server. It may be overloaded.")
+                    # Print the raw data to the screen so we aren't flying blind if the API changes again
+                    st.error(f"Received an unsupported response status '{status}'. Raw data: {data}")
                     
             except Exception as e:
                 st.error(f"An API connection error occurred: {e}")
