@@ -1,3 +1,4 @@
 streamlit
 pybalt
 pyyaml
+python-dotenv
