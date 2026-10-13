@@ -2,3 +2,4 @@ streamlit
 pybalt
 pyyaml
 python-dotenv
+aiohttp
